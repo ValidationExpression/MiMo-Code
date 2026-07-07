@@ -1,15 +1,15 @@
 ---
 name: drive-mimo
-description: Use when you need to programmatically drive another MiMoCode (mimo) process — supports both headless `mimo run` with JSON events and interactive TUI via tmux for full terminal interaction testing. Reach for it to script, test, or automate a separate mimo instance and validate its behavior from parseable evidence.
+description: Use when you need to programmatically drive another MiMoCode (mimo) process — supports both headless `mimo run` with JSON events and interactive TUI via tmux for full terminal interaction testing. Covers driving either an installed `mimo` binary or a dev build launched from source with `bun dev` (for debugging mimocode itself). Reach for it to script, test, or automate a separate mimo instance and validate its behavior from parseable evidence.
 ---
 
 # Drive MiMo
 
 ## Overview
 
-Two modes for driving a separate `mimo` process:
+Two **interfaces** for driving a separate mimo process:
 
-| Mode | Command | Use when |
+| Interface | Command | Use when |
 |------|---------|----------|
 | **Headless** | `mimo run --format json` | Scripted tasks, CI, event validation |
 | **TUI** | `mimo` in tmux | Interactive flow, permission dialogs, keybindings, visual regression |
@@ -18,14 +18,67 @@ Two modes for driving a separate `mimo` process:
 
 Always drive an *isolated* instance: give each run a fresh `MIMOCODE_HOME` and a throwaway workspace so it never touches your own config, memory, or session DB.
 
+### Two ways to launch — orthogonal to interface
+
+The interface (headless vs TUI, above) is *what you drive*. How the process is
+**launched** is a separate axis — either can be launched either way:
+
+| Launcher | Command | Use when |
+|----------|---------|----------|
+| **Installed binary** | `mimo …` | Testing a released/installed build |
+| **Dev (from source)** | `bun dev …` | Debugging mimocode itself — runs `src/index.ts` directly, no build step, picks up local code changes |
+
+Everything below uses `mimo` for brevity. To drive a **dev build** instead,
+substitute `bun dev` for `mimo` and run from the repo root — every flag,
+JSON event, and tmux technique is identical. See the Dev Mode section.
+
 ## Prerequisites
 
 ```bash
-# mimo binary must be on PATH
+# mimo binary must be on PATH (installed-binary launcher)
 which mimo || echo "mimo not found on PATH"
 
-# tmux (for TUI mode)
+# OR: dev launcher — run from the mimocode repo root, needs bun
+which bun || echo "bun not found — needed for dev mode"
+
+# tmux (for TUI interface)
 which tmux || echo "tmux not found — install it for TUI mode"
+```
+
+---
+
+## Dev Mode (debugging mimocode itself)
+
+When the goal is to debug **mimocode's own code**, launch from source with
+`bun dev` instead of the installed `mimo` binary. It runs
+`packages/opencode/src/index.ts` directly — no build step — so local edits take
+effect on the next launch.
+
+**Key facts:**
+
+- Run from the **repo root**. `bun dev` == `bun run dev`.
+- It is the dev equivalent of the `mimo` command: same CLI, same subcommands
+  and flags. `bun dev --help`, `bun dev run …`, `bun dev serve`, etc.
+- Args pass straight through, so **both interfaces work under dev**:
+  - Headless: `bun dev run --format json --dangerously-skip-permissions …`
+  - TUI:      `bun dev <workspace>` (positional workspace arg, as with `mimo`)
+- If `MIMOCODE_HOME` is not set, dev defaults it to a repo-local `.dev-home`
+  dir. For an isolated driven run, set `MIMOCODE_HOME=$(mktemp -d)` explicitly
+  just like with the binary.
+
+**Substitution rule:** anywhere Part 1 / Part 2 / Part 3 below say `mimo`,
+replace it with `bun dev` (invoked from the repo root) to drive a dev build.
+
+```bash
+# Headless, dev build (from repo root)
+REPO=/path/to/mimocode/checkout   # your local mimocode repo root
+MIMOCODE_HOME=$(mktemp -d) bun --cwd "$REPO" dev run \
+  --format json --dangerously-skip-permissions --dir "$WORKSPACE" \
+  < "$PROMPT" > /tmp/mimo-dev.jsonl 2>&1
+
+# TUI, dev build in tmux (from repo root)
+tmux new-session -d -s "$SESSION" -x 120 -y 30 \
+  "cd $REPO && MIMOCODE_HOME=$(mktemp -d) MIMOCODE_PURE=true bun dev $WORKSPACE; sleep 999"
 ```
 
 ---
