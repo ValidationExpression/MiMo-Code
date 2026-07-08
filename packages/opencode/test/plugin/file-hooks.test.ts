@@ -50,6 +50,7 @@ describe("plugin file hooks", () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
         await Bun.write(path.join(dir, ".mimocode", "hooks", "greet.ts"), hookSource("v1"))
+        await Bun.write(path.join(dir, "mimocode.json"), '{}')
       },
     })
     const hookFile = path.join(tmp.path, ".mimocode", "hooks", "greet.ts")
@@ -66,7 +67,7 @@ describe("plugin file hooks", () => {
           fs.writeFileSync(hookFile, hookSource("v2"))
           const future = new Date(Date.now() + 5000)
           fs.utimesSync(hookFile, future, future)
-          yield* Effect.promise(() => Bun.sleep(600))
+          yield* Effect.promise(() => Bun.sleep(1200))
 
           return yield* triggerTransform()
         }).pipe(Effect.provide(Plugin.defaultLayer), Effect.runPromise),
@@ -79,6 +80,7 @@ describe("plugin file hooks", () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
         await fs.promises.mkdir(path.join(dir, ".mimocode", "hooks"), { recursive: true })
+        await Bun.write(path.join(dir, "mimocode.json"), '{}')
       },
     })
 
@@ -90,7 +92,7 @@ describe("plugin file hooks", () => {
           expect(first.system).toEqual([])
 
           fs.writeFileSync(path.join(tmp.path, ".mimocode", "hooks", "late.ts"), hookSource("late"))
-          yield* Effect.promise(() => Bun.sleep(600))
+          yield* Effect.promise(() => Bun.sleep(1200))
 
           return yield* triggerTransform()
         }).pipe(Effect.provide(Plugin.defaultLayer), Effect.runPromise),
@@ -107,6 +109,7 @@ describe("plugin file hooks", () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
         const sink = path.join(dir, "events.log")
+        await Bun.write(path.join(dir, "mimocode.json"), '{}')
         await Bun.write(
           path.join(dir, ".mimocode", "hooks", "listener.ts"),
           [
@@ -138,7 +141,7 @@ describe("plugin file hooks", () => {
             yield* bus.publish(Session.Event.Error, {
               error: { name: "UnknownError", data: { message: "probe" } } as any,
             })
-            yield* Effect.promise(() => Bun.sleep(300))
+            yield* Effect.promise(() => Bun.sleep(600))
           }),
         ),
     })
