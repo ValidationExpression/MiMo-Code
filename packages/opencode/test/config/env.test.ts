@@ -142,3 +142,92 @@ test("config env supports {env:VAR} substitution", async () => {
     else delete process.env["MIMO_TEST_ENV_TARGET"]
   }
 })
+
+// Reload idempotency: both get() calls run inside ONE Effect.provide(layer),
+// so the layer closure (which holds the injected-key tracking map) persists
+// across invalidate(). This mirrors a live config reload in a running process
+// where process.env is long-lived.
+const reloadScenario = (dir: string, rewrite: () => Promise<void>) =>
+  Config.Service.use((svc) =>
+    Effect.gen(function* () {
+      yield* svc.get()
+      yield* Effect.promise(rewrite)
+      yield* svc.invalidate(true)
+      return yield* svc.get()
+    }),
+  ).pipe(Effect.scoped, Effect.provide(layer))
+
+test("editing a config env value takes effect on reload", async () => {
+  const key = "MIMO_TEST_ENV_EDIT"
+  const original = process.env[key]
+  delete process.env[key]
+
+  try {
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await Filesystem.write(
+          path.join(dir, "mimocode.json"),
+          JSON.stringify({ $schema: "https://opencode.ai/config.json", env: { [key]: "v1" } }),
+        )
+      },
+    })
+
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const config = await Effect.runPromise(
+          reloadScenario(tmp.path, () =>
+            Filesystem.write(
+              path.join(tmp.path, "mimocode.json"),
+              JSON.stringify({ $schema: "https://opencode.ai/config.json", env: { [key]: "v2" } }),
+            ),
+          ),
+        )
+        expect(config.env?.[key]).toBe("v2")
+        // The edited value replaces our own prior injection, not treated as a
+        // pre-existing real env var.
+        expect(process.env[key]).toBe("v2")
+      },
+    })
+  } finally {
+    if (original !== undefined) process.env[key] = original
+    else delete process.env[key]
+  }
+})
+
+test("removing a config env key restores original on reload", async () => {
+  const key = "MIMO_TEST_ENV_REMOVE"
+  const original = process.env[key]
+  delete process.env[key]
+
+  try {
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await Filesystem.write(
+          path.join(dir, "mimocode.json"),
+          JSON.stringify({ $schema: "https://opencode.ai/config.json", env: { [key]: "injected" } }),
+        )
+      },
+    })
+
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        await Effect.runPromise(
+          reloadScenario(tmp.path, () =>
+            Filesystem.write(
+              path.join(tmp.path, "mimocode.json"),
+              JSON.stringify({ $schema: "https://opencode.ai/config.json", env: {} }),
+            ),
+          ),
+        )
+        // Was unset before injection → removing the config key unsets it again,
+        // rather than leaving the stale "injected" value behind.
+        expect(process.env[key]).toBeUndefined()
+      },
+    })
+  } finally {
+    if (original !== undefined) process.env[key] = original
+    else delete process.env[key]
+  }
+})
