@@ -132,6 +132,31 @@ test("build agent unaffected — no hardPermission", async () => {
   })
 })
 
+test("compose:* skills are denied for build/plan, allowed for compose", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const agents = await load(tmp.path, (svc) => svc.list())
+      for (const name of ["build", "plan"]) {
+        const agent = agents.find((a) => a.name === name)
+        expect(agent).toBeDefined()
+        expect(Permission.evaluate("skill", "compose:brainstorm", agent!.permission).action).toBe("deny")
+        expect(Permission.evaluate("skill", "compose:tdd", agent!.permission).action).toBe("deny")
+        expect(Permission.evaluate("skill", "compose:review", agent!.permission).action).toBe("deny")
+      }
+      const compose = agents.find((a) => a.name === "compose")
+      expect(compose).toBeDefined()
+      expect(Permission.evaluate("skill", "compose:brainstorm", compose!.permission).action).toBe("allow")
+      expect(Permission.evaluate("skill", "compose:tdd", compose!.permission).action).toBe("allow")
+      expect(Permission.evaluate("skill", "compose:review", compose!.permission).action).toBe("allow")
+      // Non-compose skills remain allowed for all agents
+      expect(Permission.evaluate("skill", "effect", agents.find((a) => a.name === "build")!.permission).action).toBe("allow")
+      expect(Permission.evaluate("skill", "effect", compose!.permission).action).toBe("allow")
+    },
+  })
+})
+
 test("plan_enter and plan_exit are allowed for build and plan agents", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({

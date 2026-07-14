@@ -111,23 +111,21 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           this.set(name)
         },
         move(direction: 1 | -1) {
-          batch(() => {
-            const current = this.current()
-            if (!current) return
-            const list = agents()
-            const currentIdx = list.findIndex((x) => x.name === current.name)
-            for (let i = 1; i < list.length; i++) {
-              let idx = currentIdx + direction * i
-              idx = ((idx % list.length) + list.length) % list.length
-              const candidate = list[idx]
-              if (!candidate) continue
-              if (canSwitchTo(candidate.name)) {
-                setAgentStore("current", candidate.name)
-                return
-              }
+          const current = this.current()
+          if (!current) return
+          const list = agents()
+          const currentIdx = list.findIndex((x) => x.name === current.name)
+          for (let i = 1; i < list.length; i++) {
+            let idx = currentIdx + direction * i
+            idx = ((idx % list.length) + list.length) % list.length
+            const candidate = list[idx]
+            if (!candidate) continue
+            if (canSwitchTo(candidate.name)) {
+              setAgentStore("current", candidate.name)
+              return
             }
-            switchBlockedToast()
-          })
+          }
+          switchBlockedToast()
         },
         setSessionHasMessages(value: boolean) {
           setAgentStore("sessionHasMessages", value)
