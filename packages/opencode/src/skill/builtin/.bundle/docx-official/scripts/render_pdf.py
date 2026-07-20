@@ -49,7 +49,7 @@ def render_pdf(source: Path, out_dir: Path | None = None) -> Path:
         cmd = [
             soffice,
             "--headless",
-            f"-env:UserInstallation=file://{scratch}",
+            f"-env:UserInstallation={Path(scratch).as_uri()}",  # bare file://{path} breaks on Windows
             "--convert-to", "pdf",
             "--outdir", str(dest_dir),
             str(source),

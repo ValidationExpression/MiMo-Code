@@ -73,7 +73,7 @@ def _isolated_profile() -> Iterator[str]:
     its own scratch directory sidesteps the problem entirely.
     """
     with tempfile.TemporaryDirectory(prefix="soffice-profile-") as td:
-        yield f"file://{td}"
+        yield Path(td).as_uri()  # proper file:/// URI on every platform (bare f"file://{td}" breaks on Windows)
 
 
 def _invoke(input_path: Path, out_dir: Path, target: str) -> Path:
@@ -107,13 +107,19 @@ def _rasterize(pdf_path: Path, out_dir: Path, image_ext: str, *,
                dpi: int = 150,
                first: int | None = None,
                last: int | None = None) -> list[Path]:
-    binary = _which_pdftoppm()
     out_dir.mkdir(parents=True, exist_ok=True)
+    file_ext = "jpg" if image_ext in ("jpg", "jpeg") else image_ext
+
+    if shutil.which("pdftoppm") is None and os.environ.get("MIMO_PYTHON"):
+        # No Poppler, but a bundled Python (with pypdfium2 preinstalled) is available.
+        return _rasterize_pypdfium2(pdf_path, out_dir, file_ext,
+                                    dpi=dpi, first=first, last=last)
+
+    binary = _which_pdftoppm()
     prefix = out_dir / "slide"
 
     # pdftoppm's flag is `-jpeg` but the files it writes end in `.jpg`.
     flag = "jpeg" if image_ext in ("jpg", "jpeg") else image_ext
-    file_ext = "jpg" if image_ext in ("jpg", "jpeg") else image_ext
 
     args: list[str] = [binary, f"-{flag}", "-r", str(dpi)]
     if first is not None:
@@ -127,6 +133,44 @@ def _rasterize(pdf_path: Path, out_dir: Path, image_ext: str, *,
         raise BridgeError(f"pdftoppm exited {result.returncode}: {result.stderr}")
 
     return sorted(out_dir.glob(f"slide-*.{file_ext}"))
+
+
+def _rasterize_pypdfium2(pdf_path: Path, out_dir: Path, file_ext: str, *,
+                         dpi: int,
+                         first: int | None,
+                         last: int | None) -> list[Path]:
+    """Poppler-free fallback: render via pypdfium2 in the bundled interpreter.
+
+    Renders all pages (pypdfium2_cli page-range syntax varies across versions),
+    then trims to [first, last] and renames to the `slide-N.<ext>` convention
+    the pdftoppm path produces, so downstream globs keep working.
+    """
+    python_bin = os.environ["MIMO_PYTHON"]
+    fmt = "jpg" if file_ext == "jpg" else file_ext
+    result = subprocess.run(
+        [python_bin, "-m", "pypdfium2_cli", "render", str(pdf_path),
+         "--output", str(out_dir), "--format", fmt, "--scale", str(dpi / 72.0)],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        raise BridgeError(
+            f"pypdfium2 fallback exited {result.returncode}: {result.stderr}")
+
+    kept: list[Path] = []
+    for page in sorted(out_dir.glob(f"{pdf_path.stem}_*.{fmt}")):
+        try:
+            number = int(page.stem.rsplit("_", 1)[1])
+        except ValueError:
+            continue
+        if (first is not None and number < first) or (last is not None and number > last):
+            page.unlink()
+            continue
+        target = out_dir / f"slide-{number}.{file_ext}"
+        page.replace(target)
+        kept.append(target)
+    if not kept:
+        raise BridgeError("pypdfium2 fallback produced no images")
+    return sorted(kept)
 
 
 def translate(source: Path, target: str, *,

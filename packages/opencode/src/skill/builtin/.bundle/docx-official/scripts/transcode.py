@@ -66,7 +66,7 @@ class LibreOfficeBackend:
             cmd = [
                 self._executable,
                 "--headless",
-                f"-env:UserInstallation=file://{profile}",
+                f"-env:UserInstallation={Path(profile).as_uri()}",  # bare file://{path} breaks on Windows
                 "--convert-to", target_fmt,
                 "--outdir", str(out_dir),
                 str(source),
@@ -121,6 +121,9 @@ class Transcode:
 
     def _rasterise(self, pdf: Path, out_dir: Path) -> list[Path]:
         if shutil.which("pdftoppm") is None:
+            if os.environ.get("MIMO_PYTHON"):
+                # No Poppler, but a bundled Python (with pypdfium2 preinstalled) exists.
+                return self._rasterise_pypdfium2(pdf, out_dir)
             raise BackendMissing(
                 "pdftoppm (Poppler) is not on PATH. Install poppler-utils, "
                 "or convert only as far as PDF."
@@ -136,6 +139,28 @@ class Transcode:
         if not pages:
             raise BackendFailure("pdftoppm produced no PNG output.")
         return pages
+
+    def _rasterise_pypdfium2(self, pdf: Path, out_dir: Path) -> list[Path]:
+        """Poppler-free fallback: render via pypdfium2 in the bundled interpreter,
+        renamed to the `<stem>-N.png` convention the pdftoppm path produces."""
+        proc = subprocess.run(
+            [os.environ["MIMO_PYTHON"], "-m", "pypdfium2_cli", "render", str(pdf),
+             "--output", str(out_dir), "--format", "png",
+             "--scale", str(self.dpi / 72.0)],
+            capture_output=True, text=True,
+        )
+        if proc.returncode != 0:
+            raise BackendFailure(
+                f"pypdfium2 fallback exit {proc.returncode}: {proc.stderr}"
+            )
+        pages: list[Path] = []
+        for page in sorted(out_dir.glob(f"{pdf.stem}_*.png")):
+            target = out_dir / page.name.replace(f"{pdf.stem}_", f"{pdf.stem}-", 1)
+            page.replace(target)
+            pages.append(target)
+        if not pages:
+            raise BackendFailure("pypdfium2 fallback produced no PNG output.")
+        return sorted(pages)
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
