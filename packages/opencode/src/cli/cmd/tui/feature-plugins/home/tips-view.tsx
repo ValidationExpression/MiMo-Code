@@ -15,7 +15,6 @@ const PRIORITY_WEIGHTS: Record<string, number> = {
   "tui.tips.multi_skills": 60,
   "tui.tips.free_models": 50,
   "tui.tips.background": 50,
-  "tui.tips.compose_next": 50,
   "tui.tips.login": 40,
   "tui.tips.theme_mode": 40,
   "tui.tips.tab_agent": 40,
@@ -29,7 +28,6 @@ const TIP_KEYS = [
   "tui.tips.multi_skills",
   "tui.tips.free_models",
   "tui.tips.background",
-  "tui.tips.compose_next",
   "tui.tips.theme_mode",
   "tui.tips.doc",
   "tui.tips.attach_file",
@@ -186,10 +184,12 @@ export function Tips() {
   const [key, setKey] = createSignal(nextKey())
   const interval = setInterval(() => setKey(nextKey()), TIP_ROTATION_MS)
   onCleanup(() => clearInterval(interval))
-  // When the current agent becomes Compose, override the tip immediately
-  // (do not wait for the next rotation tick).
+  // Refresh the tip immediately whenever the current agent changes so entry
+  // into Compose shows the deprecation tip without waiting for the next
+  // rotation tick, and leaving Compose immediately drops it.
   createEffect(() => {
-    if (isComposeAgent()) setKey(COMPOSE_LOCK_TIP)
+    isComposeAgent()
+    setKey(nextKey())
   })
   const parts = createMemo(() => parse(lang.t(key(), { count: themeCount })))
   const labelColor = createMemo(() => {

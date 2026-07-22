@@ -76,7 +76,7 @@ Three additive deprecation touchpoints:
 
    > Legacy Compose is deprecated but remains available for compatibility. With a Fable/Sol-class model, switch to Build and run `/compose-next`.
 
-2. **Home tips — context-aware lock on Compose** — one new tip `tui.tips.compose_next` recommending Build + `/compose-next` is added to the rotating home tips pool (`packages/opencode/src/cli/cmd/tui/feature-plugins/home/tips-view.tsx`) with weight `50`, same tier as `multi_skills` / `free_models`. Additionally, when the current agent is `compose` and the Tips component is mounted (home only), the rotation is **locked** to `tui.tips.compose_next`: the interval timer is cleared and the tip key is fixed to that entry. When the agent changes away from `compose`, the interval restarts and normal weighted rotation resumes. Tab-switching into Compose from home therefore visibly and immediately shows the recommendation in place, without adding any new UI element. Tab-switching in a session view does not affect this — the Tips component only renders on home.
+2. **Home tips — compose-only recommendation** — one new tip `tui.tips.compose_next` recommending Build + `/compose-next` is added to the i18n dictionaries but **not** to `TIP_KEYS` / `PRIORITY_WEIGHTS` (`packages/opencode/src/cli/cmd/tui/feature-plugins/home/tips-view.tsx`). The tip is surfaced exclusively via a compose-agent gate: `nextKey()` returns `tui.tips.compose_next` while `local.agent.current()?.name === "compose"`, and picks weighted from the normal pool otherwise. A `createEffect` re-runs on agent change and refreshes the tip immediately on both entry and exit, so the compose recommendation appears the instant the user Tab-cycles into Compose and disappears the instant they leave — no rotation-tick staleness in either direction. Tab-switching in a session view does not affect this — the Tips component only renders on home.
 
 3. **Agent label suffix "(legacy)"** — the input-bar agent label at `packages/opencode/src/cli/cmd/tui/component/prompt/index.tsx` (currently renders `Locale.titlecase(agent.name)`) shows `Compose (legacy)` when the current agent is `compose`. This is a pure display concern; agent identity and routing remain `compose`. The suffix is intentionally not localized — "legacy" reads the same across the locales this project supports, and adding an i18n key just for a single-word technical suffix costs more than it earns.
 
@@ -108,8 +108,7 @@ If a future skill genuinely needs namespace-level gating, the scope refactor can
 Add:
 
 - `packages/opencode/src/skill/builtin/.bundle/compose-next/SKILL.md`
-- `packages/opencode/test/skill/compose-next-discovery.test.ts`
-- `packages/opencode/test/tool/skill-search-hidden.test.ts` (or extend an existing search test)
+- `packages/opencode/test/permission/compose-next-discovery.test.ts`
 
 Modify:
 
@@ -117,8 +116,9 @@ Modify:
 - `packages/opencode/src/session/prompt/compose.txt` — append the same deprecation line as a single-line edit; do not rewrite the file.
 - `packages/opencode/src/tool/skill-search.ts` — resolve current agent from context and source the searchable list from `Skill.available(agent)` instead of `Skill.all()`. Update the tool description string accordingly if needed.
 - `packages/opencode/src/cli/cmd/tui/component/prompt/index.tsx` — the input-bar agent label render (currently `Locale.titlecase(agent().name)`) shows `Compose (legacy)` when `agent.name === "compose"`. Pure display change; identity, routing, tab-cycle and everything else remain the same.
-- `packages/opencode/src/cli/cmd/tui/feature-plugins/home/tips-view.tsx` — add `"tui.tips.compose_next"` to `TIP_KEYS` and to `PRIORITY_WEIGHTS` with weight `50`. Compose-agent lock: on each rotation tick pick `tui.tips.compose_next` when the current agent is `compose`, otherwise pick weighted. An additional `createEffect` overrides the tip immediately on compose entry so it does not wait for the next tick.
+- `packages/opencode/src/cli/cmd/tui/feature-plugins/home/tips-view.tsx` — do NOT add `tui.tips.compose_next` to `TIP_KEYS` or `PRIORITY_WEIGHTS`. Instead surface it via a compose-only gate inside `Tips()`: `nextKey()` returns the compose tip while `isComposeAgent()`, otherwise weighted-picks; a `createEffect(() => { isComposeAgent(); setKey(nextKey()) })` refreshes the tip instantly on every agent change so entry and exit are both immediate. The rotation interval keeps using `nextKey()` so the compose tip stays fixed while the agent is compose.
 - `packages/opencode/src/cli/cmd/tui/feature-plugins/home/tips.tsx` — remove the `first = session.count() === 0` gate so tips render on a fresh project too. Original behavior hid tips from first-time users, which is the population that most needs the guidance.
+- `packages/opencode/test/skill/search.test.ts` — extend with two assertions: `compose-next` is NOT excluded by the `startsWith("compose:")` filter (name has a dash, not a colon), and callers that pass a list not containing `compose-next` see no `compose-next` in results (mirrors production `available(defaultAgent)`).
 - All seven i18n locale files under `packages/opencode/src/cli/cmd/tui/i18n/` (`en.ts`, `es.ts`, `fr.ts`, `ja.ts`, `ru.ts`, `zh.ts`, `zht.ts`) — add two keys each: `tui.tips.compose_next`, `tui.skill.compose-next.description`.
 
 Do not touch:
@@ -143,12 +143,11 @@ These are copied via `git checkout origin/compose-slim -- <path>` into a scratch
 
 ### Tests
 
-- Discovery: `compose-next` appears in `Skill.all()`; `compose-next` is absent from `Skill.available(defaultAgent)`; `compose-next` is absent from `Skill.available(composeAgent)` (Compose Next is not a Compose-mode internal).
-- Slash surface: command registry / app skills endpoint returns `compose-next` (Build slash autocomplete works).
-- Skill search: `skill_search` on a query that would otherwise match `compose-next` does not return it under the default agent.
+- Discovery: `Permission.evaluate("skill", "compose-next", defaultAgentRules)` returns `deny`; the compose agent inherits the same deny (Compose Next is not a Compose-mode internal); ordinary skills return `allow`; `compose:*` legacy pattern still denied on default and allowed on compose.
+- Search input filter: `compose-next` is NOT dropped by the `startsWith("compose:")` filter in `skill/search.ts` (its name has a dash, not a colon); callers that pass a list not containing `compose-next` (mirroring `Skill.available(defaultAgent)`) get no `compose-next` in results.
 - Legacy invariants preserved: existing `compose:*` filter tests remain green unchanged.
-- i18n: a light test asserts each of the two new keys is present in all seven locale files (mirror any existing `i18n` completeness test if one exists; if not, add a small one).
-- Tip lock: on the home view with `agent.name === "compose"`, the current tip key is `tui.tips.compose_next` and no rotation occurs; changing the agent back to a non-compose primary restores rotation.
+- i18n: the existing `skill-description.test.ts` completeness check exercises the two new `tui.skill.compose-next.*` keys; the `tui.tips.compose_next` key is loaded by `Tips()` when the compose agent is active.
+- Tip gate: on the home view with `agent.name === "compose"`, the current tip key is `tui.tips.compose_next`; changing the agent back to a non-compose primary immediately swaps to a weighted-picked non-compose tip.
 - Agent label suffix: the input-bar label reads `Compose (legacy)` when the current agent is `compose`, and `Build` / `Plan` unchanged for those agents.
 
 ### Verification
@@ -193,7 +192,7 @@ Draft PR opens in Ready state (not Draft) since this is the successor implementa
 - [ ] T2: add exact `"compose-next": "deny"` to default agent skill permission — acceptance: `Skill.available(defaultAgent)` omits `compose-next`; `Skill.all()` includes it; test asserts both (covers: S2, S3)
 - [ ] T3: switch `tool/skill-search.ts` to `Skill.available(agent)` — acceptance: search over a query matching `compose-next` under the default agent returns no result; existing search tests remain green (covers: S2, S3)
 - [ ] T4: append deprecation line to Compose agent `description` in `agent.ts` and to `compose.txt` opening prompt — acceptance: single-line addition in each; Compose agent behavior otherwise unchanged; existing Compose tests green (covers: S2)
-- [ ] T5: add home tip `tui.tips.compose_next` (weight `50`) to `tips-view.tsx` and implement compose-agent lock (pick lock key while agent is compose, resume weighted picking on exit; immediate override via `createEffect` on compose entry); remove the first-session gate in `tips.tsx` so tips also render on a fresh project; add key to all seven locale files — acceptance: tip enters the rotation on home; on a fresh project the tips row still renders; switching to Compose immediately shows compose_next; switching away resumes rotation; all seven locales carry the key (covers: S2)
+- [ ] T5: surface `tui.tips.compose_next` as a compose-agent-only tip in `tips-view.tsx` (excluded from `TIP_KEYS`/`PRIORITY_WEIGHTS`; `nextKey()` gate + agent-change `createEffect` for instant entry/exit); remove the first-session gate in `tips.tsx` so tips also render on a fresh project; add key to all seven locale files — acceptance: tip is shown iff current agent is `compose`; on a fresh project the tips row renders; instant swap on both directions; all seven locales carry the key (covers: S2)
 - [ ] T6: show `Compose (legacy)` in the input-bar agent label when the current agent is `compose` — acceptance: agent identity, routing, and Tab-cycle unchanged; only the rendered label carries the suffix; label for `build`/`plan` unchanged (covers: S2)
 - [ ] T7: add `tui.skill.compose-next.description` to all seven locales — acceptance: skill dialog / autocomplete render the localized description (covers: S2)
 - [ ] T8: verification band pass — acceptance: relevant `bun test` bands and `bun typecheck` and `git diff --check` all pass from `packages/opencode` (covers: S3)
