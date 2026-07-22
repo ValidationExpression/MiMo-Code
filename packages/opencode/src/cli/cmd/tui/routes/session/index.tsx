@@ -42,6 +42,7 @@ import type { GlobTool } from "@/tool/glob"
 import type { GrepTool } from "@/tool/grep"
 import type { EditTool } from "@/tool/edit"
 import type { ApplyPatchTool } from "@/tool/apply_patch"
+import type { ViewImageTool } from "@/tool/view-image"
 import type { WebFetchTool } from "@/tool/webfetch"
 import type { CodeSearchTool } from "@/tool/codesearch"
 import type { WebSearchTool } from "@/tool/websearch"
@@ -2094,6 +2095,9 @@ function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMess
         <Match when={props.part.tool === "read"}>
           <Read {...toolprops} />
         </Match>
+        <Match when={props.part.tool === "view_image"}>
+          <ViewImage {...toolprops} />
+        </Match>
         <Match when={props.part.tool === "grep"}>
           <Grep {...toolprops} />
         </Match>
@@ -3026,6 +3030,21 @@ function Read(props: ToolProps<typeof ReadTool>) {
         )}
       </For>
     </>
+  )
+}
+
+function ViewImage(props: ToolProps<typeof ViewImageTool>) {
+  const isRunning = createMemo(() => props.part.state.status === "running")
+  return (
+    <InlineTool
+      icon="◉"
+      pending="Viewing image..."
+      complete={props.input.path}
+      spinner={isRunning()}
+      part={props.part}
+    >
+      View image {normalizePath(props.input.path!)} {input(props.input, ["path"])}
+    </InlineTool>
   )
 }
 

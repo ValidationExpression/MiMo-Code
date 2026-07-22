@@ -8,6 +8,7 @@ import { GrepTool } from "./grep"
 import { HistoryTool } from "./history"
 import { MemoryTool } from "./memory"
 import { ReadTool } from "./read"
+import { ViewImageTool } from "./view-image"
 import { ActorTool } from "./actor"
 import { TaskTool } from "./task"
 import { CronTool } from "./cron"
@@ -136,6 +137,7 @@ export const layer = Layer.effect(
     const invalid = yield* InvalidTool
     const actor = yield* ActorTool
     const read = yield* ReadTool
+    const viewimage = yield* ViewImageTool
     const question = yield* QuestionTool
     const lsptool = yield* LspTool
     const planexit = yield* PlanExitTool
@@ -234,6 +236,7 @@ export const layer = Layer.effect(
           invalid: Tool.init(invalid),
           bash: Tool.init(bash),
           read: Tool.init(read),
+          viewimage: Tool.init(viewimage),
           glob: Tool.init(globtool),
           grep: Tool.init(greptool),
           edit: Tool.init(edit),
@@ -267,6 +270,7 @@ export const layer = Layer.effect(
             ...(questionEnabled ? [tool.question] : []),
             tool.bash,
             tool.read,
+            tool.viewimage,
             tool.glob,
             tool.grep,
             tool.edit,
@@ -372,10 +376,10 @@ export const layer = Layer.effect(
           return input.providerID === ProviderID.opencode || Flag.MIMOCODE_ENABLE_EXA
         }
 
-        const usePatch =
+        const useGPTTools =
           input.modelID.includes("gpt-") && !input.modelID.includes("oss") && !input.modelID.includes("gpt-4")
-        if (tool.id === ApplyPatchTool.id) return usePatch
-        if (tool.id === EditTool.id || tool.id === WriteTool.id) return !usePatch
+        if (tool.id === ApplyPatchTool.id || tool.id === ViewImageTool.id) return useGPTTools
+        if (tool.id === EditTool.id || tool.id === WriteTool.id || tool.id === ReadTool.id) return !useGPTTools
 
         return true
       })
