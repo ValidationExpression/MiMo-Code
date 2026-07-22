@@ -56,7 +56,7 @@ Build the management presentation.
           const agent = { name: "build", mode: "primary" as const, permission: [], options: {} }
           const tool = (yield* registry.tools({
             providerID: "opencode" as any,
-            modelID: "gpt-5" as any,
+            modelID: "mimo-v2" as any,
             agent,
           })).find((item) => item.id === SkillSearchTool.id)
           if (!tool) throw new Error("Skill search tool not found")
@@ -99,7 +99,7 @@ Build the management presentation.
           const agent = { name: "build", mode: "primary" as const, permission: [], options: {} }
           const tool = (yield* registry.tools({
             providerID: "opencode" as any,
-            modelID: "gpt-5" as any,
+            modelID: "mimo-v2" as any,
             agent,
           })).find((item) => item.id === SkillSearchTool.id)
           if (!tool) throw new Error("Skill search tool not found")
@@ -160,7 +160,7 @@ description: Analyze quasar telemetry and operational metrics.
           const agent = { name: "build", mode: "primary" as const, permission: [], options: {} }
           const tool = (yield* registry.tools({
             providerID: "opencode" as any,
-            modelID: "gpt-5" as any,
+            modelID: "mimo-v2" as any,
             agent,
           })).find((item) => item.id === SkillSearchTool.id)
           if (!tool) throw new Error("Skill search tool not found")

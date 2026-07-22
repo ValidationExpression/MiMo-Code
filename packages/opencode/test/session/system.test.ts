@@ -102,4 +102,29 @@ description: ${description}
       process.env.USERPROFILE = userProfile
     }
   })
+
+  test("does not prompt GPT or Claude models to use skill_search", async () => {
+    await using tmp = await tmpdir({ git: true })
+
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const build = await load(tmp.path, (svc) => svc.get("build"))
+        const prompts = await Effect.runPromise(
+          Effect.gen(function* () {
+            const system = yield* SystemPrompt.Service
+            return yield* Effect.all([
+              system.skills(build!, { id: "gpt-5.4" }),
+              system.skills(build!, { id: "claude-sonnet-4-6" }),
+              system.skills(build!, { id: "mimo-v2" }),
+            ])
+          }).pipe(Effect.provide(SystemPrompt.defaultLayer)),
+        )
+
+        expect(prompts[0]).not.toContain("skill_search")
+        expect(prompts[1]).not.toContain("skill_search")
+        expect(prompts[2]).toContain("skill_search")
+      },
+    })
+  })
 })

@@ -337,7 +337,7 @@ export const layer = Layer.effect(
         const captureSession = yield* sessions.get(input.sessionID).pipe(Effect.catch(() => Effect.succeed(undefined)))
         if (!captureSession) return empty
         const [skills, env, instructions] = yield* Effect.all([
-          sys.skills(ag),
+          sys.skills(ag, model),
           sys.environment(model, captureSession.time.created),
           instruction.system().pipe(Effect.orDie),
         ])
@@ -3527,7 +3527,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             }
 
             const [skills, env, instructions] = yield* Effect.all([
-              sys.skills(agent),
+              sys.skills(agent, model),
               sys.environment(model, session.time.created),
               instruction.system().pipe(Effect.orDie),
             ])

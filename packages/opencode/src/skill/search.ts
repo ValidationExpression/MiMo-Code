@@ -9,6 +9,20 @@ export type SearchResult = {
   reason: string
 }
 
+export type SkillSearchModel = {
+  id?: string
+  modelID?: string
+  name?: string
+  family?: string
+  api?: { id?: string }
+}
+
+export function isSkillSearchDisabled(model: SkillSearchModel) {
+  return [model.id, model.modelID, model.api?.id, model.name, model.family]
+    .filter((value) => value !== undefined)
+    .some((value) => /(^|[^a-z0-9])(claude|gpt)($|[^a-z0-9])/i.test(value))
+}
+
 function normalize(value: string) {
   return value.toLocaleLowerCase().trim()
 }
