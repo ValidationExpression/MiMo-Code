@@ -15,7 +15,7 @@ MiMoCode (CLI binary `mimo`) is an agentic coding tool with a terminal UI, built
 
 | Feature | What it is | How to reach it |
 |---------|-----------|-----------------|
-| **Agents / modes** | `build` (default, full tools), `plan` (read-only analysis), `compose` (specs-driven orchestration), plus custom modes you define | `Tab` cycles primary agents; add your own via `.mimocode/agent/<name>.md` (see @reference/guide.md) |
+| **Agents / modes** | `build` (default, full tools), `plan` (read-only analysis), `compose` (specs-driven orchestration), plus custom modes you define. Mode locks after the first message (Build↔Plan still switch freely; Compose is isolated) | `Tab` cycles primary agents; add your own via `.mimocode/agent/<name>.md` (see @reference/guide.md) |
 | **Subagents** | Primary agent spawns `general`/`explore` helpers, parallel + background, with lifecycle/cancel | automatic; `actor` tooling |
 | **Persistent memory** | Markdown-backed memory with indexed search across `MEMORY.md`, `checkpoint.md`, `notes.md`, and `tasks/<id>/progress.md` | auto-injected on resume |
 | **Context management** | Auto-checkpoints, context reconstruction near limit, budgeted injection | automatic; tune via `checkpoint`/`compaction` config |
@@ -28,6 +28,7 @@ MiMoCode (CLI binary `mimo`) is an agentic coding tool with a terminal UI, built
 | **Scheduled prompts** | Cron/loop: inject a prompt on a schedule or repeating loop (UTC, 5-field) | `cron` tool · `/loop` · `/loops` |
 | **Dynamic workflows** | JS scripts that orchestrate many subagents deterministically (fan-out, pipelines, nesting); built-ins include `compose`, `deep-research`, `fact-check`, and `research-experiment` | `.mimocode/workflows/*.js` + `workflow` tool |
 | **Skills / self-extension** | Add tools, hooks, skills under `.mimocode/` | see the `evolve` skill |
+| **Skill discovery** | `/skill-name` slash invocation (2+ in one message auto-load with an orchestration plan); `skill_search` tool matches by exact name/alias + BM25 and auto-loads high-confidence hits; some builtins (`claude-code`, `codex`) only appear when their CLI is installed | `/` autocomplete · automatic |
 | **MCP** | Local & remote Model Context Protocol servers | `mcp` config + `mimo mcp` |
 
 ## Configuration Basics

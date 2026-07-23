@@ -24,6 +24,9 @@ export const meta = {
   whenToUse: "when the backlog needs sorting",  // optional
   phases: [{ title: "Fetch" }, { title: "Classify" }],  // optional
   model: "standard",                   // optional default model for agents
+  permissions: [                       // optional up-front permission requests
+    { permission: "bash", patterns: ["git *"], reason: "read repo history" },
+  ],
 }
 
 export default async function () {
@@ -33,6 +36,8 @@ export default async function () {
 ```
 
 Only `name` and `description` are required. The body is ordinary async JS with the sandbox globals below.
+
+`meta.permissions` declares permissions the run will need: each entry is asked ONCE up-front (interactively when the run is foreground), the grant lands in the session ruleset, and background subagents inherit it — no mid-run permission stalls. A denial doesn't abort the run.
 
 ## In-script API (sandbox globals)
 

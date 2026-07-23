@@ -4,7 +4,7 @@ How-to for the features users most often ask about. For config keys see @config.
 
 ## Getting started & auth
 
-1. **Sign in** — `mimo account login <url>` runs a device flow: it prints a URL + code and opens your browser. `/connect` does the same from inside the TUI (e.g. to add OpenRouter). Other account subcommands: `logout`, `switch`, `orgs`, `open`, `console`.
+1. **Sign in** — `mimo account login <url>` runs a device flow: it prints a URL + code and opens your browser. `/connect` does the same from inside the TUI (e.g. to add OpenRouter). OAuth logins are available for Xiaomi MiMo, Codex (ChatGPT Pro/Plus), and xAI (Grok); Claude Code auth can be imported from `~/.claude/settings*.json`. Other account subcommands: `logout`, `switch`, `orgs`, `open`, `console`.
 2. **Pick a model** — set `"model": "provider/model"` in config, or switch live in the TUI model dialog. Provider API keys are auto-detected from environment variables (unless `MIMOCODE_MIMO_ONLY=1`).
 3. **List what's available** — `mimo models`, `mimo providers`.
 
