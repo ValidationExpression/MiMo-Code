@@ -105,6 +105,31 @@ Add optional metadata only when the user supplied it or a current authoritative 
 - If the user prefers not to store plaintext, use a config token such as `"apiKey": "{env:CUSTOM_API_KEY}"` and explain that the variable must exist in the MiMoCode process environment. Do not silently switch to an environment reference when the user asked for a ready-to-use persisted configuration.
 - If a real key was posted in a conversation or log, recommend rotating it after completing the requested setup.
 
+## Keep a newly configured model in TUI recents
+
+When the user supplies a new API key and model to configure, update the TUI recent-model state after the provider config validates. Do this whether the request makes the model the default or only registers it: the recent entry is what makes the model immediately available to the TUI model-cycle shortcut.
+
+The state file is `model.json` under MiMoCode's state directory:
+
+- With a non-empty absolute `MIMOCODE_HOME`: `$MIMOCODE_HOME/state/model.json`.
+- Otherwise: the XDG state directory for MiMoCode, normally `~/.local/state/mimocode/model.json` on Linux and macOS. Respect `XDG_STATE_HOME` when it is set.
+
+Read the existing JSON object first. Preserve every top-level field, especially `favorite` and `variant`. Prepend the configured model to `recent`, remove any later entry with the same `providerID` and `modelID`, preserve the order of all other entries, and keep at most 10 entries:
+
+```json
+{
+  "recent": [
+    { "providerID": "custom", "modelID": "MODEL_ID" }
+  ],
+  "favorite": [],
+  "variant": {}
+}
+```
+
+The snippet illustrates the shape; it is not permission to reset existing fields. If the file does not exist, create it with the new `recent` entry plus empty `favorite` and `variant` values. If it contains malformed JSON, do not overwrite it silently: preserve or back it up before repairing it. Never put the API key, base URL, display name, or combined `provider/model` string in a recent entry.
+
+Write the recent state only after `mimo models PROVIDER_ID` confirms that the exact model is registered. An already-running TUI may have loaded the old state and can overwrite an external edit, so tell the user to close or restart that TUI before relying on the updated shortcut.
+
 ## Minimal edit and verification
 
 Preserve JSONC comments, `$schema`, unrelated providers, models, and settings. Avoid whole-file rewrites when a targeted insertion is possible.
@@ -117,4 +142,4 @@ mimo models PROVIDER_ID
 
 Confirm that the output contains exactly `PROVIDER_ID/MODEL_ID`. This proves the config parsed and the provider/model registered; it does not prove the remote credential, endpoint, or selected wire protocol works. If the current TUI session already pinned a model, reselect it or start a new session after the edit.
 
-In the final response, name the config file and selected `provider/model`, state whether it was added or made default, and report local validation. Never include the key.
+In the final response, name the config file and recent-model state file, identify the selected `provider/model`, state whether it was added or made default, and report local validation. Never include the key.
