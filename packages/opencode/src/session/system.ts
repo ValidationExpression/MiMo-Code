@@ -19,6 +19,7 @@ import { sortVisionModels } from "@/provider/provider"
 import type { Agent } from "@/agent/agent"
 import { Permission } from "@/permission"
 import { Skill } from "@/skill"
+import { isSkillSearchDisabled, type SkillSearchModel } from "@/skill/search"
 
 export function provider(model: Provider.Model) {
   if (model.api.id.includes("gpt-4") || model.api.id.includes("o1") || model.api.id.includes("o3"))
@@ -41,7 +42,7 @@ export function provider(model: Provider.Model) {
 
 export interface Interface {
   readonly environment: (model: Provider.Model, now: number) => Effect.Effect<string[]>
-  readonly skills: (agent: Agent.Info) => Effect.Effect<string | undefined>
+  readonly skills: (agent: Agent.Info, model?: SkillSearchModel) => Effect.Effect<string | undefined>
   readonly available: (agent?: Agent.Info) => Effect.Effect<Skill.Info[]>
   readonly all: () => Effect.Effect<Skill.Info[]>
 }
@@ -75,7 +76,10 @@ export const layer = Layer.effect(
           ].join("\n"),
           `IMPORTANT: Your response must ALWAYS strictly follow the same major language as the user.`,
         ]
-        if (!model.capabilities.input.image) {
+        const maskVisionCapability = [model.id, model.api.id, model.providerID].some((id) =>
+          /(^|[^a-z0-9])(gpt|claude|gemini)($|[^a-z0-9])/i.test(id),
+        )
+        if (!model.capabilities.input.image && !maskVisionCapability) {
           // NOTE: vision models are resolved per-call (lazy). If provider list changes
           // mid-session, this block may differ between turns and break cached system prefix.
           // In practice provider config is stable within a session.
@@ -110,10 +114,18 @@ export const layer = Layer.effect(
         return base
       }),
 
-      skills: Effect.fn("SystemPrompt.skills")(function* (agent: Agent.Info) {
+      skills: Effect.fn("SystemPrompt.skills")(function* (agent: Agent.Info, model?: SkillSearchModel) {
         if (Permission.disabled(["skill"], agent.permission).has("skill")) return
 
         const list = yield* skill.available(agent)
+
+        if (model && isSkillSearchDisabled(model)) {
+          return [
+            "Skills provide specialized instructions and workflows for specific tasks.",
+            "Use the skill tool to load a skill when a task matches its description.",
+            Skill.fmt(list, { verbose: true }),
+          ].join("\n")
+        }
 
         return [
           "Skills provide specialized instructions and workflows for specific tasks.",
