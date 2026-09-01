@@ -326,6 +326,9 @@ const VoiceInputArgsSchema = z.object({
         })
         .strict(),
     ])
+    // Same as actor/task/cron `operation`: without this the emitted schema has
+    // only anyOf and some models stringify the whole envelope.
+    .meta({ type: "object" })
     .optional()
     .describe("Text edit, if any. Choose exactly one arm: insert, set, or set_with_cursor."),
   send: z.boolean().optional().describe("true to submit. Only when send_enabled is true."),
@@ -334,7 +337,6 @@ const VoiceInputArgsSchema = z.object({
 export type VoiceInputArgs = z.infer<typeof VoiceInputArgsSchema>
 
 // Single source of truth: zod is the runtime validator; JSON Schema is derived for the API.
-// Field descriptions live on the zod schema via .describe() and are emitted by toJSONSchema.
 // Drop $schema — some OpenAI-compatible gateways reject unknown top-level keys in tool parameters.
 function stripSchemaKeyword(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stripSchemaKeyword)
@@ -455,8 +457,9 @@ export function parseVoiceControlResponse(message: unknown, opts: { sendEnabled?
     if (toolCalls.length > 1) {
       return { ok: false, actions: [], protocolError: `Call the ${VOICE_INPUT_TOOL_NAME} tool exactly once.`, previous }
     }
-    const fn = ((toolCalls[0] as { function?: { name?: string; arguments?: string } })?.function) ?? {}
-    if (fn.name !== VOICE_INPUT_TOOL_NAME) {
+    const fn = ((toolCalls[0] as { function?: { name?: string; arguments?: string | Record<string, unknown> } })?.function) ?? {}
+    // Some gateways omit function.name when only one tool is registered.
+    if (fn.name && fn.name !== VOICE_INPUT_TOOL_NAME) {
       return { ok: false, actions: [], protocolError: `Call the ${VOICE_INPUT_TOOL_NAME} tool.`, previous }
     }
     const rawArg = fn.arguments
@@ -543,7 +546,14 @@ export async function processVoiceControl(opts: {
       log.debug("voice control result", { model, actions: parsed.actions.length, attempt })
       return { ok: true, actions: parsed.actions }
     }
-    log.warn("voice control protocol error", { model, attempt, protocolError: parsed.protocolError })
+    log.warn("voice control protocol error", {
+      model,
+      attempt,
+      protocolError: parsed.protocolError,
+      hasToolCalls: !!parsed.previous.tool_calls?.length,
+      toolCallNames: parsed.previous.tool_calls?.map((c) => (c as { function?: { name?: string } })?.function?.name),
+      contentPreview: parsed.previous.content?.slice(0, 200),
+    })
     if (attempt >= VOICE_CONTROL_MAX_PROTOCOL_RETRIES) return { ok: false, reason: "protocol" }
     body = buildVoiceControlRetryBody(body, parsed.previous, parsed.protocolError ?? "protocol error")
   }
