@@ -49,6 +49,13 @@ describe("isMcpToolSearchEnabled", () => {
     expect(isMcpToolSearchEnabled(false, undefined, "mimo-v2.6-ptc")).toBe(true)
   })
 
+  test("does not force MCP tool search for GPT models when process Codex mode is disabled", () => {
+    process.env.MIMOCODE_CODEX_MODE = "false"
+    expect(isMcpToolSearchEnabled(false, undefined, "gpt-5.2")).toBe(false)
+    expect(isMcpToolSearchEnabled(false, "codex", "claude-opus-4-6")).toBe(false)
+    expect(isMcpToolSearchEnabled(true, undefined, "gpt-5.2")).toBe(true)
+  })
+
   test("allows the resolved session mode to override the process mode", () => {
     expect(isMcpToolSearchEnabled(false, "codex", "claude-opus-4-6")).toBe(true)
     expect(isMcpToolSearchEnabled(false, "codex", "mimo-v2.6")).toBe(true)
@@ -83,6 +90,13 @@ describe("usesGPTToolset", () => {
     expect(usesGPTToolset("claude-opus-4-6")).toBe(true)
     expect(usesGPTToolset("mimo-v2.6")).toBe(true)
     expect(usesGPTToolset("mimo-v2.6-ptc")).toBe(true)
+  })
+
+  test("uses the default toolset for GPT models when process Codex mode is disabled", () => {
+    process.env.MIMOCODE_CODEX_MODE = "false"
+    expect(usesGPTToolset("gpt-5.2")).toBe(false)
+    expect(usesGPTToolset("deployment-primary", undefined, "gpt-5.2", "gpt")).toBe(false)
+    expect(usesGPTToolset("claude-opus-4-6", "codex")).toBe(false)
   })
 
   test("allows the resolved session mode to override the process mode", () => {
