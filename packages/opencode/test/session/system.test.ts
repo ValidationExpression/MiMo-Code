@@ -246,6 +246,18 @@ describe("session.system", () => {
     expect(SystemPrompt.provider(ProviderTest.model({ id: ModelID.make("mimo-v2.6-ptc") }))[0]).toBe(gpt)
   })
 
+  test("disabled Codex mode forces the default prompt for GPT models", () => {
+    const normal = SystemPrompt.provider(ProviderTest.model({ id: ModelID.make("model-default") }))[0]
+    process.env.MIMOCODE_CODEX_MODE = "false"
+
+    expect(SystemPrompt.provider(ProviderTest.model({ id: ModelID.make("gpt-5.4") }))[0]).toBe(normal)
+    expect(
+      SystemPrompt.provider(
+        ProviderTest.model({ id: ModelID.make("deployment-primary"), api: { id: "gpt-5.4" } as never }),
+      )[0],
+    ).toBe(normal)
+  })
+
   test("allows the resolved session mode to override the process harness mode", () => {
     const model = ProviderTest.model({
       id: ModelID.make("claude-sonnet-4-6"),

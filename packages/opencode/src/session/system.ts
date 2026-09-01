@@ -23,7 +23,7 @@ import type { Agent } from "@/agent/agent"
 import { Permission } from "@/permission"
 import { Skill } from "@/skill"
 import { Flag } from "@/flag/flag"
-import { type HarnessMode, isGPTModel } from "@/tool/gpt"
+import { type HarnessMode, isGPTModel, usesGPTToolset } from "@/tool/gpt"
 
 function renderGitResult(result: Git.Result, fallback = "(none)") {
   if (result.exitCode !== 0) return fallback
@@ -33,9 +33,11 @@ function renderGitResult(result: Git.Result, fallback = "(none)") {
 const anthropicEnvironment = new Map<string, string>()
 
 export function provider(model: Provider.Model, harness?: HarnessMode) {
-  if (harness === "codex" || ((harness === undefined || harness === "auto") && Flag.MIMOCODE_CODEX_MODE)) return [PROMPT_GPT]
+  if (usesGPTToolset(model.id, harness, model.api.id, model.family)) return [PROMPT_GPT]
   const prompt = (id: string) => {
-    if (isGPTModel(id)) return PROMPT_GPT
+    // An explicit process override can route GPT here; keep its prompt aligned
+    // with the default tool schema instead of advertising Codex-only tools.
+    if (isGPTModel(id)) return PROMPT_DEFAULT
     if (id.includes("gpt-4") || id.includes("o1") || id.includes("o3")) return PROMPT_BEAST
     if (id.includes("gemini-")) return PROMPT_GEMINI
     if (id.includes("claude")) return PROMPT_ANTHROPIC
