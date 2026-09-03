@@ -2062,6 +2062,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           messages: msgs,
           metadata: (val: { title?: string; metadata?: Record<string, any> }) =>
             Effect.gen(function* () {
+              if (part.state.status !== "running") return
               part = yield* sessions.updatePart({
                 ...part,
                 type: "tool",
@@ -2091,7 +2092,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               assistantMessage.time.completed = Date.now()
               yield* sessions.updateMessage(assistantMessage)
               if (part.state.status === "running") {
-                yield* sessions.updatePart({
+                part = yield* sessions.updatePart({
                   ...part,
                   state: {
                     status: "error",
@@ -2124,7 +2125,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       yield* sessions.updateMessage(assistantMessage)
 
       if (result && part.state.status === "running") {
-        yield* sessions.updatePart({
+        part = yield* sessions.updatePart({
           ...part,
           state: {
             status: "completed",
@@ -2139,7 +2140,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       }
 
       if (!result) {
-        yield* sessions.updatePart({
+        part = yield* sessions.updatePart({
           ...part,
           state: {
             status: "error",
