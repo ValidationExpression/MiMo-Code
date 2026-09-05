@@ -5257,6 +5257,11 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         )
       }
       const agentID = input.agentID ?? "main"
+      // Abandon the recovered assistant BEFORE detaching runLoop so callers that
+      // observe Error / completed state see it immediately (not only in ensuring
+      // after the detached loop finishes). ensuring below remains as an idempotent
+      // safety net (abandonRecoveredAssistant no-ops once completed is set).
+      yield* abandonRecoveredAssistant({ sessionID: input.sessionID, assistantMessageID: input.assistantMessageID, agentID })
       return yield* state.ensureRunning(
         input.sessionID,
         agentID,
@@ -5288,6 +5293,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         )
       }
       const agentID = input.agentID ?? "main"
+      // Abandon before detaching runLoop — same timing requirement as resume.
+      yield* abandonRecoveredAssistant({ sessionID: input.sessionID, assistantMessageID: input.assistantMessageID, agentID })
       yield* state.start(
         input.sessionID,
         agentID,
